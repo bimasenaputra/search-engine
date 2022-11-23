@@ -1,5 +1,4 @@
 import array
-from math import log
 
 class StandardPostings:
     """ 
@@ -53,6 +52,41 @@ class StandardPostings:
         decoded_postings_list.frombytes(encoded_postings_list)
         return decoded_postings_list.tolist()
 
+    @staticmethod
+    def encode_tf(tf_list):
+        """
+        Encode list of term frequencies menjadi stream of bytes
+
+        Parameters
+        ----------
+        tf_list: List[int]
+            List of term frequencies
+
+        Returns
+        -------
+        bytes
+            bytearray yang merepresentasikan nilai raw TF kemunculan term di setiap
+            dokumen pada list of postings
+        """
+        return StandardPostings.encode(tf_list)
+
+    @staticmethod
+    def decode_tf(encoded_tf_list):
+        """
+        Decodes list of term frequencies dari sebuah stream of bytes
+
+        Parameters
+        ----------
+        encoded_tf_list: bytes
+            bytearray merepresentasikan encoded term frequencies list sebagai keluaran
+            dari static method encode_tf di atas.
+
+        Returns
+        -------
+        List[int]
+            List of term frequencies yang merupakan hasil decoding dari encoded_tf_list
+        """
+        return StandardPostings.decode(encoded_tf_list)
 
 class VBEPostings:
     """ 
@@ -121,6 +155,24 @@ class VBEPostings:
         return bytearray(encoded_postings)
 
     @staticmethod
+    def encode_tf(tf_list):
+        """
+        Encode list of term frequencies menjadi stream of bytes
+
+        Parameters
+        ----------
+        tf_list: List[int]
+            List of term frequencies
+
+        Returns
+        -------
+        bytes
+            bytearray yang merepresentasikan nilai raw TF kemunculan term di setiap
+            dokumen pada list of postings
+        """
+        return VBEPostings.vb_encode(tf_list)
+
+    @staticmethod
     def vb_decode(encoded_bytestream):
         """
         Decoding sebuah bytestream yang sebelumnya di-encode dengan
@@ -161,82 +213,41 @@ class VBEPostings:
             encoded_id_list.append(encoded_id_list[i-1] + gap_list_bytestream[i])
         return encoded_id_list
 
-class EliasGammaPostings:
-
     @staticmethod
-    def gamma_encode_number(number):
-        # Implementation: https://www.geeksforgeeks.org/elias-gamma-encoding-in-python/
-        log2 = lambda x: log(x, 2)
+    def decode_tf(encoded_tf_list):
+        """
+        Decodes list of term frequencies dari sebuah stream of bytes
 
-        if number == 0: 
-            return '0'
-      
-        n = 1 + int(log2(number))
-        b = number - 2**(int(log2(number)))
-      
-        l = int(log2(number))
-        
-        s = '{0:0%db}' % l
-        binary = s.format(b)
-        unary = (n-1)*'0' +'1'
-      
-        binarystring = unary + binary
+        Parameters
+        ----------
+        encoded_tf_list: bytes
+            bytearray merepresentasikan encoded term frequencies list sebagai keluaran
+            dari static method encode_tf di atas.
 
-        # convert binary string to bytes 
-        # https://stackoverflow.com/questions/32675679/convert-binary-string-to-bytearray-in-python-3
-        return int(binarystring, 2).to_bytes((len(binarystring) + 7) // 8, byteorder='big')
-
-    @staticmethod
-    def gamma_encode(list_of_numbers):
-        bytes = []
-        for number in list_of_numbers:
-            bytes.append(EliasGammaPostings.gamma_encode_number(number))
-        return b"".join(bytes)
-
-    @staticmethod
-    def encode(postings_list):
-        gap_list = [postings_list[i] if i == 0 else postings_list[i] - postings_list[i-1] for i in range(len(postings_list))]
-        encoded_postings = EliasGammaPostings.gamma_encode(gap_list)
-        return bytearray(encoded_postings)
-
-    @staticmethod
-    def gamma_decode(encoded_bytestream):
-        # Implementation based on https://www.geeksforgeeks.org/elias-gamma-decoding-in-python/ with some modifications
-
-        numbers = []
-        i = 0
-        while i < len(encoded_bytestream):
-            while encoded_bytestream[i] == 0:
-                i = i + 1
-
-            j = i
-            while j < len(encoded_bytestream) and encoded_bytestream[j] != 0:
-                j = j + 1
-
-            number = int.from_bytes(encoded_bytestream[i:j], byteorder='big')
-            numbers.append(number)
-
-            i = j
-        
-        return numbers
-
-    @staticmethod
-    def decode(encoded_postings_list):
-        gap_list_bytestream = EliasGammaPostings.gamma_decode(encoded_postings_list)
-        encoded_id_list = [gap_list_bytestream[0]]
-        for i in range(1, len(gap_list_bytestream)):
-            encoded_id_list.append(encoded_id_list[i-1] + gap_list_bytestream[i])
-        return encoded_id_list
+        Returns
+        -------
+        List[int]
+            List of term frequencies yang merupakan hasil decoding dari encoded_tf_list
+        """
+        return VBEPostings.vb_decode(encoded_tf_list)
 
 if __name__ == '__main__':
     
     postings_list = [34, 67, 89, 454, 2345738]
-    for Postings in [StandardPostings, VBEPostings, EliasGammaPostings]:
+    tf_list = [12, 10, 3, 4, 1]
+    for Postings in [StandardPostings, VBEPostings]:
         print(Postings.__name__)
         encoded_postings_list = Postings.encode(postings_list)
-        print("byte hasil encode: ", encoded_postings_list)
-        print("ukuran encoded postings: ", len(encoded_postings_list), "bytes")
+        encoded_tf_list = Postings.encode_tf(tf_list)
+        print("byte hasil encode postings: ", encoded_postings_list)
+        print("ukuran encoded postings   : ", len(encoded_postings_list), "bytes")
+        print("byte hasil encode TF list : ", encoded_tf_list)
+        print("ukuran encoded postings   : ", len(encoded_tf_list), "bytes")
+        
         decoded_posting_list = Postings.decode(encoded_postings_list)
-        print("hasil decoding: ", decoded_posting_list)
+        decoded_tf_list = Postings.decode_tf(encoded_tf_list)
+        print("hasil decoding (postings): ", decoded_posting_list)
+        print("hasil decoding (TF list) : ", decoded_tf_list)
         assert decoded_posting_list == postings_list, "hasil decoding tidak sama dengan postings original"
+        assert decoded_tf_list == tf_list, "hasil decoding tidak sama dengan postings original"
         print()

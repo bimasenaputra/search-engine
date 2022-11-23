@@ -7,7 +7,7 @@ class IdMap:
     akan melakukan hal tersebut.
     """
 
-    def __init__(self, strings = []):
+    def __init__(self):
         """
         Mapping dari string (term atau nama dokumen) ke id disimpan dalam
         python's dictionary; cukup efisien. Mapping sebaliknya disimpan dalam
@@ -65,35 +65,56 @@ class IdMap:
         else:
             raise TypeError
 
-def sorted_intersect(list1, list2):
+def sorted_merge_posts_and_tfs(posts_tfs1, posts_tfs2):
     """
-    Intersects two (ascending) sorted lists and returns the sorted result
-    Melakukan Intersection dua (ascending) sorted lists dan mengembalikan hasilnya
-    yang juga terurut.
+    Menggabung (merge) dua lists of tuples (doc id, tf) dan mengembalikan
+    hasil penggabungan keduanya (TF perlu diakumulasikan untuk semua tuple
+    dengn doc id yang sama), dengan aturan berikut:
+
+    contoh: posts_tfs1 = [(1, 34), (3, 2), (4, 23)]
+            posts_tfs2 = [(1, 11), (2, 4), (4, 3 ), (6, 13)]
+
+            return   [(1, 34+11), (2, 4), (3, 2), (4, 23+3), (6, 13)]
+                   = [(1, 45), (2, 4), (3, 2), (4, 26), (6, 13)]
 
     Parameters
     ----------
-    list1: List[Comparable]
-    list2: List[Comparable]
-        Dua buah sorted list yang akan di-intersect.
+    list1: List[(Comparable, int)]
+    list2: List[(Comparable, int]
+        Dua buah sorted list of tuples yang akan di-merge.
 
     Returns
     -------
-    List[Comparable]
-        intersection yang sudah terurut
+    List[(Comparablem, int)]
+        Penggabungan yang sudah terurut
     """
-    intersected_list = []
+    merged_list = []
     p1, p2 = 0, 0
-    while p1 != len(list1) and p2 != len(list2):
-        if list1[p1] == list2[p2]:
-            intersected_list.append(list1[p1])
+    while p1 != len(posts_tfs1) and p2 != len(posts_tfs2):
+        if posts_tfs1[p1][0] == posts_tfs2[p2][0]:
+            merged_list.append((posts_tfs1[p1][0], posts_tfs1[p1][1] + posts_tfs2[p2][1]))
             p1 += 1
             p2 += 1
-        elif list1[p1] < list2[p2]:
+        elif posts_tfs1[p1][0] < posts_tfs2[p2][0]:
+            merged_list.append(posts_tfs1[p1])
             p1 += 1
         else:
+            merged_list.append(posts_tfs2[p2])
             p2 += 1
-    return intersected_list
+
+    while p1 != len(posts_tfs1):
+        merged_list.append(posts_tfs1[p1])
+        p1 += 1
+    
+    while p2 != len(posts_tfs2):
+        merged_list.append(posts_tfs2[p2])
+        p2 += 1
+
+    return merged_list
+
+def test(output, expected):
+    """ simple function for testing """
+    return "PASSED" if output == expected else "FAILED"
 
 if __name__ == '__main__':
 
@@ -111,6 +132,5 @@ if __name__ == '__main__':
     doc_id_map = IdMap()
     assert [doc_id_map[docname] for docname in docs] == [0, 1, 2], "docs_id salah"
     
-    assert sorted_intersect([1, 2, 3], [2, 3]) == [2, 3], "sorted_intersect salah"
-    assert sorted_intersect([4, 5], [1, 4, 7]) == [4], "sorted_intersect salah"
-    assert sorted_intersect([], []) == [], "sorted_intersect salah"
+    assert sorted_merge_posts_and_tfs([(1, 34), (3, 2), (4, 23)], \
+                                      [(1, 11), (2, 4), (4, 3 ), (6, 13)]) == [(1, 45), (2, 4), (3, 2), (4, 26), (6, 13)], "sorted_merge_posts_and_tfs salah"
