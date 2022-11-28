@@ -9,6 +9,7 @@ import spacy
 from index import InvertedIndexReader, InvertedIndexWriter
 from util import IdMap, sorted_merge_posts_and_tfs
 from compression import StandardPostings, VBEPostings
+from letor import NFCorpusDataset, Letor
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
 from tqdm import tqdm
@@ -25,14 +26,21 @@ class BSBIIndex:
     postings_encoding: Lihat di compression.py, kandidatnya adalah StandardPostings,
                     VBEPostings, dsb.
     index_name(str): Nama dari file yang berisi inverted index
+    doc_dir(str): Path ke koleksi dokumen untuk kebutuhan word embedding
+    ranker_dir(str): Path ke pre-trained model untuk di load
+    model: Untuk word embedding
+    ranker: Learning-to-rank model untuk memprediksi relevansi dokumen terhadap suatu query
     """
-    def __init__(self, data_dir, output_dir, postings_encoding, index_name = "main_index"):
+    def __init__(self, data_dir, output_dir, postings_encoding, doc_dir = "", ranker_dir = None, index_name = "main_index"):
         self.term_id_map = IdMap()
         self.doc_id_map = IdMap()
         self.data_dir = data_dir
         self.output_dir = output_dir
         self.index_name = index_name
         self.postings_encoding = postings_encoding
+        corpus = NFCorpusDataset(doc_dir)
+        self.model = corpus.getModel()
+        self.ranker = Letor(ranker_dir)
 
         # Untuk menyimpan nama-nama file dari semua intermediate inverted index
         self.intermediate_indices = []
@@ -177,6 +185,41 @@ class BSBIIndex:
         merged_index.append(curr, postings, tf_list)
 
     def retrieve_wand_tfidf(self, query, k = 10):
+        """
+        Melakukan Ranked Retrieval dengan skema DaaT (Document-at-a-Time).
+        Method akan mengembalikan top-K retrieval results.
+
+        w(t, D) = (1 + log tf(t, D))       jika tf(t, D) > 0
+                = 0                        jika sebaliknya
+
+        w(t, Q) = IDF = log (N / df(t))
+
+        Score = untuk setiap term di query, akumulasikan w(t, Q) * w(t, D).
+                (tidak perlu dinormalisasi dengan panjang dokumen)
+
+        catatan: 
+            1. informasi DF(t) ada di dictionary postings_dict pada merged index
+            2. informasi TF(t, D) ada di tf_li
+            3. informasi N bisa didapat dari doc_length pada merged index, len(doc_length)
+
+        Parameters
+        ----------
+        query: str
+            Query tokens yang dipisahkan oleh spasi
+
+            contoh: Query "universitas indonesia depok" artinya ada
+            tiga terms: universitas, indonesia, dan depok
+
+        Result
+        ------
+        List[(int, str)]
+            List of tuple: elemen pertama adalah score similarity, dan yang
+            kedua adalah nama dokumen.
+            Daftar Top-K dokumen terurut mengecil BERDASARKAN SKOR.
+
+        JANGAN LEMPAR ERROR/EXCEPTION untuk terms yang TIDAK ADA di collection.
+
+        """
         nlp = spacy.load("en_core_web_sm")
 
         stemmer_factory = StemmerFactory()
@@ -376,6 +419,50 @@ class BSBIIndex:
 
         topk = sorted(zip(scores.values(), [self.doc_id_map[doc_id] for doc_id in scores.keys()]), reverse=True)[:k]
         return topk
+
+    def retrieve_letor(self, query, k = 10):
+        """
+        Melakukan Ranked Retrieval dengan skema TaaT (Term-at-a-Time).
+        Method akan mengembalikan top-K retrieval results.
+
+        w(t, D) = (1 + log tf(t, D))       jika tf(t, D) > 0
+                = 0                        jika sebaliknya
+
+        w(t, Q) = IDF = log (N / df(t))
+
+        Score = untuk setiap term di query, akumulasikan w(t, Q) * w(t, D).
+                (tidak perlu dinormalisasi dengan panjang dokumen)
+
+        Kemudian, method akan melakukan reranking top-K retrieval results
+        dengan model learning-to rank.
+
+        Parameters
+        ----------
+        query: str
+            Query tokens yang dipisahkan oleh spasi
+
+            contoh: Query "universitas indonesia depok" artinya ada
+            tiga terms: universitas, indonesia, dan depok
+
+        Result
+        ------
+        List[(int, str)]
+            List of tuple: elemen pertama adalah score similarity, dan yang
+            kedua adalah nama dokumen.
+            Daftar Top-K dokumen terurut mengecil BERDASARKAN SKOR.
+
+        JANGAN LEMPAR ERROR/EXCEPTION untuk terms yang TIDAK ADA di collection.
+
+        """
+        topk = self.retrieve_bm25(query, k = k)
+        query_doc_vec = []
+        for _, did in topk:
+            with open(did, encoding="utf-8") as f:
+                doc = f.read()
+                query_doc_vec.append(self.model.features(query.split(), doc.split())) 
+        doc_id = [did for (_, did) in topk]
+        reranked = self.ranker.rank(query_doc_vec, doc_id)
+        return reranked
 
     def index(self):
         """

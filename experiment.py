@@ -113,7 +113,9 @@ def eval(qrels, query_file = "queries.txt", k = 1000):
   """
   BSBI_instance = BSBIIndex(data_dir = 'collection', \
                           postings_encoding = VBEPostings, \
-                          output_dir = 'index')
+                          output_dir = 'index', \
+                          doc_dir = 'nfcorpus/train.docs', \
+                          ranker_dir = 'model2.txt')
 
   BSBI_instance.load()
 
@@ -129,7 +131,7 @@ def eval(qrels, query_file = "queries.txt", k = 1000):
       # HATI-HATI, doc id saat indexing bisa jadi berbeda dengan doc id
       # yang tertera di qrels
       ranking = []
-      for (score, doc) in BSBI_instance.retrieve_bm25(query, k = k):
+      for (score, doc) in BSBI_instance.retrieve_letor(query, k = k):
           did = int(re.search(r'.*\\.*\\(.*).txt', doc).group(1))
           ranking.append(qrels[qid][did])
       rbp_scores.append(rbp(ranking))

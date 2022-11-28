@@ -5,7 +5,9 @@ from compression import VBEPostings
 # BSBIIndex hanya sebagai abstraksi untuk index tersebut
 BSBI_instance = BSBIIndex(data_dir = 'collection', \
                           postings_encoding = VBEPostings, \
-                          output_dir = 'index')
+                          output_dir = 'index', \
+                          doc_dir = 'nfcorpus/train.docs', \
+                          ranker_dir = 'model2.txt')
 BSBI_instance.load()
 
 queries = ["alkylated with radioactive iodoacetate", \
@@ -14,6 +16,6 @@ queries = ["alkylated with radioactive iodoacetate", \
 for query in queries:
     print("Query  : ", query)
     print("Results:")
-    for (score, doc) in BSBI_instance.retrieve_tfidf(query, k = 10):
+    for (score, doc) in BSBI_instance.retrieve_letor(query, k = 10):
         print(f"{doc:30} {score:>.3f}")
     print()

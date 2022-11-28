@@ -1,0 +1,48 @@
+//============================================
+Hasil evaluasi terhadap 30 queries.
+
+TLDR. dengan mengubah boosting type ke goss dan
+menambahkan l1 regularization dengan nilai 0.005 
+sebagai parameter awal didapatkan hasil letor 
+yang lebih baik.
+
+Metrics:
+DCG: Semakin besar nilainya, semakin baik.
+AP: Semakin mendekati 1, semakin baik.
+RBP: Semakin mendekati 1, semakin baik.
+//=============================================
+
+//=============================================
+BM25 dengan LETOR
+
+initial parameter:
+objective="lambdarank",
+boosting_type = "gbdt",
+n_estimators = 100,
+importance_type = "gain",
+metric = "ndcg",
+num_leaves = 40,
+learning_rate = 0.02,
+max_depth = -1
+//=============================================
+RBP score = 0.2711316705876919
+DCG score = 4.185422624093316
+AP score  = 0.2165642770278568
+
+//=============================================
+BM25 dengan LETOR
+
+initial parameter:
+objective="lambdarank",
+boosting_type = "goss",
+n_estimators = 100,
+importance_type = "gain",
+metric = "ndcg",
+num_leaves = 40,
+learning_rate = 0.02,
+reg_alpha = 0.005,
+max_depth = -1
+//=============================================
+RBP score = 0.2772500562766049
+DCG score = 4.213496329101484
+AP score  = 0.21222658650220116

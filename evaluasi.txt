@@ -1,0 +1,35 @@
+//============================================
+Hasil evaluasi terhadap 30 queries.
+
+TLDR. tanpa letor lebih baik dibandingkan 
+dengan letor.
+
+Metrics:
+DCG: Semakin besar nilainya, semakin baik.
+AP: Semakin mendekati 1, semakin baik.
+RBP: Semakin mendekati 1, semakin baik.
+//=============================================
+
+//=============================================
+BM25 tanpa LETOR
+//=============================================
+RBP score = 0.5750134881612422
+DCG score = 5.410855334411127
+AP score  = 0.43078959697252217
+
+//=============================================
+BM25 dengan LETOR
+
+initial parameter:
+objective="lambdarank",
+boosting_type = "gbdt",
+n_estimators = 100,
+importance_type = "gain",
+metric = "ndcg",
+num_leaves = 40,
+learning_rate = 0.02,
+max_depth = -1
+//=============================================
+RBP score = 0.2711316705876919
+DCG score = 4.185422624093316
+AP score  = 0.2165642770278568
