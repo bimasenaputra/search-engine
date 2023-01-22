@@ -21,6 +21,7 @@ git clone https://github.com/bimasenaputra/search-engine.git
 Next, install all necessary python packages.
 
 Finally, try running some example queries using BM25 ranked retrieval by running `search.py`.
+
 You can change the ranking strategy by editing search.py.
 
 **Important for DPR reranking**
@@ -29,6 +30,7 @@ Before using DPR reranking, make sure you have internet connection to download t
 
 If you want to use or finetune your own model, you can utilize squad_to_dpr.py which convert your dataset from SQuAD format to DPR format.
 
+Alternatively, you can train the model with the provided bioASQ dataset by running `dpr.py`, then load the trained model.
 ### 📋 Evaluation
 `Under construction`
 
