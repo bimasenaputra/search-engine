@@ -10,8 +10,7 @@ from index import InvertedIndexReader, InvertedIndexWriter
 from util import IdMap, sorted_merge_posts_and_tfs
 from compression import StandardPostings, VBEPostings
 from letor import NFCorpusDataset, Letor
-from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
-from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
+from dpr import BioDPR
 from tqdm import tqdm
 
 class BSBIIndex:
@@ -30,8 +29,9 @@ class BSBIIndex:
     ranker_dir(str): Path ke pre-trained model untuk di load
     model: Untuk word embedding
     ranker: Learning-to-rank model untuk memprediksi relevansi dokumen terhadap suatu query
+    DPR: Dense Passage Retriever model untuk memprediksi kemiripan dokumen terhadap query
     """
-    def __init__(self, data_dir, output_dir, postings_encoding, doc_dir = "", ranker_dir = None, index_name = "main_index"):
+    def __init__(self, data_dir, output_dir, postings_encoding, doc_dir = "", ranker_dir = None, dpr_dir = None, index_name = "main_index"):
         self.term_id_map = IdMap()
         self.doc_id_map = IdMap()
         self.data_dir = data_dir
@@ -41,6 +41,8 @@ class BSBIIndex:
         corpus = NFCorpusDataset(doc_dir)
         self.model = corpus.getModel()
         self.ranker = Letor(ranker_dir)
+        self.DPR = BioDPR()
+        self.DPR.load(dpr_dir)
 
         # Untuk menyimpan nama-nama file dari semua intermediate inverted index
         self.intermediate_indices = []
@@ -100,17 +102,10 @@ class BSBIIndex:
 
         nlp = spacy.load("en_core_web_sm")
 
-        stemmer_factory = StemmerFactory()
-        stemmer = stemmer_factory.create_stemmer()
-
-        stopword_factory = StopWordRemoverFactory()
-        stopword = stopword_factory.create_stop_word_remover()
-
         for file in files:
             with open(block_relative_path + '\\' + file) as f:
                 text = f.read().lower()
-                processed_text = stopword.remove(stemmer.stem(text))
-                doc = nlp(processed_text)
+                doc = nlp(text)
                 for token in doc:
                     if not token.is_punct:
                         td_doc_pair.append((self.term_id_map[token.text], self.doc_id_map[block_relative_path + '\\' + file]))
@@ -222,14 +217,7 @@ class BSBIIndex:
         """
         nlp = spacy.load("en_core_web_sm")
 
-        stemmer_factory = StemmerFactory()
-        stemmer = stemmer_factory.create_stemmer()
-
-        stopword_factory = StopWordRemoverFactory()
-        stopword = stopword_factory.create_stop_word_remover()
-
-        processed_query = stopword.remove(stemmer.stem(query.lower()))
-        doc = nlp(processed_query)
+        doc = nlp(query)
 
         with InvertedIndexReader(self.index_name, self.postings_encoding, directory = self.output_dir) as merged_index:
             term_pointers = {}
@@ -336,15 +324,7 @@ class BSBIIndex:
 
         """
         nlp = spacy.load("en_core_web_sm")
-
-        stemmer_factory = StemmerFactory()
-        stemmer = stemmer_factory.create_stemmer()
-
-        stopword_factory = StopWordRemoverFactory()
-        stopword = stopword_factory.create_stop_word_remover()
-
-        processed_query = stopword.remove(stemmer.stem(query.lower()))
-        doc = nlp(processed_query)
+        doc = nlp(query)
 
         scores = {}
 
@@ -393,15 +373,7 @@ class BSBIIndex:
 
         """
         nlp = spacy.load("en_core_web_sm")
-
-        stemmer_factory = StemmerFactory()
-        stemmer = stemmer_factory.create_stemmer()
-
-        stopword_factory = StopWordRemoverFactory()
-        stopword = stopword_factory.create_stop_word_remover()
-
-        processed_query = stopword.remove(stemmer.stem(query.lower()))
-        doc = nlp(processed_query)
+        doc = nlp(query)
 
         scores = {}
 
@@ -434,7 +406,7 @@ class BSBIIndex:
                 (tidak perlu dinormalisasi dengan panjang dokumen)
 
         Kemudian, method akan melakukan reranking top-K retrieval results
-        dengan model learning-to rank.
+        dengan model learning-to-rank.
 
         Parameters
         ----------
@@ -462,6 +434,51 @@ class BSBIIndex:
                 query_doc_vec.append(self.model.features(query.split(), doc.split())) 
         doc_id = [did for (_, did) in topk]
         reranked = self.ranker.rank(query_doc_vec, doc_id)
+        return reranked
+
+    def retrieve_dpr(self, query, k = 10):
+        """
+        Melakukan Ranked Retrieval dengan skema TaaT (Term-at-a-Time).
+        Method akan mengembalikan top-K retrieval results.
+
+        w(t, D) = (1 + log tf(t, D))       jika tf(t, D) > 0
+                = 0                        jika sebaliknya
+
+        w(t, Q) = IDF = log (N / df(t))
+
+        Score = untuk setiap term di query, akumulasikan w(t, Q) * w(t, D).
+                (tidak perlu dinormalisasi dengan panjang dokumen)
+
+        Kemudian, method akan melakukan reranking top-K retrieval results
+        dengan model DPR.
+
+        Parameters
+        ----------
+        query: str
+            Query tokens yang dipisahkan oleh spasi
+
+            contoh: Query "universitas indonesia depok" artinya ada
+            tiga terms: universitas, indonesia, dan depok
+
+        Result
+        ------
+        List[(int, str)]
+            List of tuple: elemen pertama adalah score similarity, dan yang
+            kedua adalah nama dokumen.
+            Daftar Top-K dokumen terurut mengecil BERDASARKAN SKOR.
+
+        JANGAN LEMPAR ERROR/EXCEPTION untuk terms yang TIDAK ADA di collection.
+
+        """
+        topk = self.retrieve_bm25(query, k = k)
+        docs = []
+        for _, did in topk:
+            with open(did, encoding="utf-8") as f:
+                doc = f.read()
+                docs.append(doc) 
+        doc_id = [did for (_, did) in topk]
+        scores = self.DPR.similarity(query, docs)
+        reranked = sorted([x for x in zip(scores, doc_id)], reverse = True)
         return reranked
 
     def index(self):
@@ -496,5 +513,8 @@ if __name__ == "__main__":
 
     BSBI_instance = BSBIIndex(data_dir = 'collection', \
                               postings_encoding = VBEPostings, \
-                              output_dir = 'index')
+                              output_dir = 'index', \
+                              doc_dir = 'nfcorpus/train.docs', \
+                              ranker_dir = 'model2.txt', \
+                              dpr_dir = 'biodpr')
     BSBI_instance.index() # memulai indexing!
