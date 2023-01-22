@@ -32,6 +32,6 @@ If you want to use or finetune your own model, you can utilize squad_to_dpr.py w
 `Under construction`
 
 Currently it is written in bonus.txt & evaluasi.txt.
-
+To evaluate ranking yourself, run `experiment.py`.
 ### Future Works
 - Implement FAISS
