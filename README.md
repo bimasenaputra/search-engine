@@ -24,12 +24,12 @@ Finally, try running some example queries using BM25 ranked retrieval by running
 You can change the ranking strategy by editing search.py.
 
 **Important for DPR reranking**
-Before using DPR reranking, make sure you have internet connection to download pre-trained model.
+
+Before using DPR reranking, make sure you have internet connection to download the pre-trained model.
 If you want to use or finetune your own model, you can utilize squad_to_dpr.py which convert your dataset from SQuAD format to DPR format.
 
 ### 📋 Evaluation
 `Under construction`
-
 
 Currently it is written in bonus.txt & evaluasi.txt.
 
