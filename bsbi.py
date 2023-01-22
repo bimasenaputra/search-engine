@@ -179,6 +179,53 @@ class BSBIIndex:
                 curr, postings, tf_list = t, postings_, tf_list_
         merged_index.append(curr, postings, tf_list)
 
+    def retrieve(self, query):
+        """
+        Melakukan boolean retrieval untuk mengambil semua dokumen yang
+        mengandung semua kata pada query. Jangan lupa lakukan pre-processing
+        yang sama dengan yang dilakukan pada proses indexing!
+        (Stemming dan Stopwords Removal)
+
+        Parameters
+        ----------
+        query: str
+            Query tokens yang dipisahkan oleh spasi
+
+            contoh: Query "universitas indonesia depok" artinya adalah
+                    boolean query "universitas AND indonesia AND depok"
+
+        Result
+        ------
+        List[str]
+            Daftar dokumen terurut yang mengandung sebuah query tokens.
+            Harus mengembalikan EMPTY LIST [] jika tidak ada yang match.
+
+        JANGAN LEMPAR ERROR/EXCEPTION untuk terms yang TIDAK ADA di collection.
+        """
+        nlp = spacy.load("en_core_web_sm")
+        doc = nlp(query)
+
+        result = None
+
+        with InvertedIndexReader(self.index_name, self.postings_encoding, directory = self.output_dir) as merged_index:
+            for token in doc:
+                if not token.is_punct:
+                    if result == None:
+                        if token.text in self.term_id_map.str_to_id:
+                            result = merged_index.get_postings_list(self.term_id_map[token.text])
+                        else:
+                            return []
+                    else:
+                        if token.text in self.term_id_map.str_to_id:
+                            result = sorted_intersect(result, merged_index.get_postings_list(self.term_id_map[token.text]))
+                        else:
+                            return []
+
+        if result == None:
+            return []
+        else:
+            return [self.doc_id_map[doc_id] for doc_id in result]
+
     def retrieve_wand_tfidf(self, query, k = 10):
         """
         Melakukan Ranked Retrieval dengan skema DaaT (Document-at-a-Time).
