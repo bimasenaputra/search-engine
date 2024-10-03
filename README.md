@@ -1,5 +1,7 @@
 # Search Engine
 
+![CLI text search engine](https://drive.google.com/uc?export=view&id=1uS86lHJ7QAAUJtxjMHsGaQyO3lgVzpX5)
+
 CLI text search engine made from scratch using Python built on top of well-known inverted index architecture.
 
 ## 🎨 Features
@@ -21,6 +23,10 @@ git clone https://github.com/bimasenaputra/search-engine.git
 Next, install all necessary python packages.
 
 Finally, try running some example queries using BM25 ranked retrieval by running `search.py`.
+
+```
+python search.py
+```
 
 You can change the ranking strategy by editing search.py.
 
